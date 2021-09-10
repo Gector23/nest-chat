@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { User } from './users/user.entity';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -14,7 +16,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
+      entities: [User],
     }),
+    UsersModule,
   ],
 })
 export class AppModule {}
