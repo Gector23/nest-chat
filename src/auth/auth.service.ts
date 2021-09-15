@@ -38,4 +38,12 @@ export class AuthService {
   signUp(createUserDto: CreateUserDto): Promise<UserDto> {
     return this.usersService.createUser(createUserDto);
   }
+
+  verifyToken(token: string): JwtPayloadInterface {
+    try {
+      return this.jwtService.verify<JwtPayloadInterface>(token);
+    } catch {
+      return null;
+    }
+  }
 }
