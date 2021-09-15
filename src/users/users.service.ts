@@ -50,4 +50,22 @@ export class UsersService {
 
     return plainToClass(UserDto, user);
   }
+
+  async toggleMute(id: string): Promise<boolean> {
+    const user = await this.findUser({ id });
+
+    user.isMuted = !user.isMuted;
+
+    await user.save();
+
+    return user.isMuted;
+  }
+
+  async toggleBlock(id: string): Promise<void> {
+    const user = await this.findUser({ id });
+
+    user.isBlocked = !user.isBlocked;
+
+    await user.save();
+  }
 }
