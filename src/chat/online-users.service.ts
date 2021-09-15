@@ -14,11 +14,11 @@ export class OnlineUsersService {
     this.users.delete(userId);
   }
 
-  getUser(userId: string): void {
-    this.users.get(userId);
+  getUserSocket(userId: string): Socket {
+    return this.users.get(userId);
   }
 
-  getUsers(): UserDto[] {
+  getOnlineUsers(): UserDto[] {
     return Object.values(Object.fromEntries(this.users)).map(
       (socket: Socket) => socket.data.user,
     );
