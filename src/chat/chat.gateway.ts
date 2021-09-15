@@ -1,5 +1,5 @@
+import { UseGuards } from '@nestjs/common';
 import {
-  ConnectedSocket,
   MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -12,7 +12,8 @@ import { AuthService } from 'src/auth/auth.service';
 import { UsersService } from 'src/users/users.service';
 import { MessageDto } from './dto/message.dto';
 import { MessageType } from './enums/message-type.enum';
-
+import { WsErrors } from './enums/ws-errors.enum';
+import { OnlineUsersService } from './online-users.service';
 @WebSocketGateway()
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -21,6 +22,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private authService: AuthService,
     private usersService: UsersService,
+    private onlineUsersService: OnlineUsersService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -29,7 +31,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const tokenPayload = this.authService.verifyToken(token);
 
     if (!tokenPayload) {
-      client.emit('error', 'Unauthorized');
+      client.emit('error', WsErrors.unauthorized);
       client.disconnect(true);
       return;
     }
@@ -37,6 +39,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const user = await this.usersService.findUserById(tokenPayload.id);
     client.data.user = user;
     client.emit('userData', user);
+    this.onlineUsersService.setUser(client.data.user.id, client);
 
     const userConectedMessage: MessageDto = {
       type: MessageType.info,
@@ -50,14 +53,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       type: MessageType.info,
       text: `${client.data.user.login} left the chat`,
     };
+
+    this.onlineUsersService.deleteUser(client.data.user.id);
+
     client.broadcast.emit('message', userConectedMessage);
   }
 
   @SubscribeMessage('message')
-  handleMessage(
-    @ConnectedSocket() client: Socket,
-    @MessageBody('message') message: string,
-  ): void {
+  handleMessage(@MessageBody('message') message: string): void {
     this.server.emit('message', message);
   }
 }
