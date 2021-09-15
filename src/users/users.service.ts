@@ -39,6 +39,12 @@ export class UsersService {
     }
   }
 
+  async findUserById(id: string): Promise<UserDto> {
+    const user = await this.findUser({ id });
+
+    return plainToClass(UserDto, user);
+  }
+
   async findUserByEmail(email: string): Promise<UserDto> {
     const user = await this.findUser({ email });
 
