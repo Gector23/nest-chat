@@ -1,18 +1,18 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Socket } from 'socket.io';
-import { WsErrors } from './enums/ws-errors.enum';
+import { WsErrors } from '../enums/ws-errors.enum';
 
 @Injectable()
-export class WsAdminGuard implements CanActivate {
+export class WsMuteGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const client = context.switchToWs().getClient<Socket>();
 
-    const isAdmin = client.data.user.isAdmin;
+    const isMuted = client.data.user.isMuted;
 
-    if (!isAdmin) {
+    if (isMuted) {
       client.emit('error', WsErrors.forbidden);
     }
 
-    return isAdmin;
+    return !isMuted;
   }
 }

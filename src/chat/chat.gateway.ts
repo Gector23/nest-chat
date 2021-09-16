@@ -14,7 +14,8 @@ import { MessageDto } from './dto/message.dto';
 import { MessageType } from './enums/message-type.enum';
 import { WsErrors } from './enums/ws-errors.enum';
 import { OnlineUsersService } from './online-users.service';
-import { WsAdminGuard } from './ws-admin.guard';
+import { WsAdminGuard } from './guards/ws-admin.guard';
+import { WsMuteGuard } from './guards/ws-mute.guard';
 @WebSocketGateway()
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -60,9 +61,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.broadcast.emit('message', userConectedMessage);
   }
 
+  @UseGuards(WsMuteGuard)
   @SubscribeMessage('message')
-  handleMessage(@MessageBody('message') message: string): void {
-    this.server.emit('message', message);
+  handleMessage(@MessageBody('message') text: string): void {
+    this.server.emit('message', text);
   }
 
   @UseGuards(WsAdminGuard)
