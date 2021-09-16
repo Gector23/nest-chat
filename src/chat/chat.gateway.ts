@@ -43,6 +43,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.emit('user-data', user);
     this.onlineUsersService.setUser(client.data.user.id, client);
 
+    this.server.emit('online-users', this.onlineUsersService.getOnlineUsers());
+
     const userConectedMessage: MessageDto = {
       type: MessageType.info,
       text: `${client.data.user.login} join to chat`,
