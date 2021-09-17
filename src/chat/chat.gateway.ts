@@ -1,5 +1,6 @@
 import { UseGuards } from '@nestjs/common';
 import {
+  ConnectedSocket,
   MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -10,12 +11,15 @@ import {
 import { Server, Socket } from 'socket.io';
 import { AuthService } from 'src/auth/auth.service';
 import { UsersService } from 'src/users/users.service';
-import { MessageDto } from './dto/message.dto';
-import { MessageType } from './enums/message-type.enum';
+import { MessageType } from '../messages/enums/message-type.enum';
 import { WsErrors } from './enums/ws-errors.enum';
 import { OnlineUsersService } from './online-users.service';
 import { WsAdminGuard } from './guards/ws-admin.guard';
 import { WsMuteGuard } from './guards/ws-mute.guard';
+import { plainToClass } from 'class-transformer';
+import { UserDto } from 'src/users/dto/user.dto';
+import { MessagesService } from 'src/messages/messages.service';
+import { CreateMessageDto } from 'src/messages/dto/create-message.dto';
 @WebSocketGateway()
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
@@ -25,6 +29,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private authService: AuthService,
     private usersService: UsersService,
     private onlineUsersService: OnlineUsersService,
+    private messagesService: MessagesService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -38,35 +43,54 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    const user = await this.usersService.findUserById(tokenPayload.id);
-    client.data.user = user;
-    client.emit('user-data', user);
+    client.data.user = await this.usersService.findUser({
+      id: tokenPayload.id,
+    });
+
+    client.emit('user-data', plainToClass(UserDto, client.data.user));
     this.onlineUsersService.setUser(client.data.user.id, client);
 
     this.server.emit('online-users', this.onlineUsersService.getOnlineUsers());
 
-    const userConectedMessage: MessageDto = {
-      type: MessageType.info,
-      text: `${client.data.user.login} join to chat`,
-    };
+    const userConectedMessage = await this.messagesService.createMessage(
+      plainToClass(CreateMessageDto, {
+        text: `${client.data.user.login} join to chat`,
+        author: null,
+        type: MessageType.info,
+      }),
+    );
     client.broadcast.emit('message', userConectedMessage);
   }
 
-  handleDisconnect(client: Socket) {
-    const userConectedMessage: MessageDto = {
-      type: MessageType.info,
-      text: `${client.data.user.login} left the chat`,
-    };
-
+  async handleDisconnect(client: Socket) {
     this.onlineUsersService.deleteUser(client.data.user.id);
+
+    const userConectedMessage = await this.messagesService.createMessage(
+      plainToClass(CreateMessageDto, {
+        text: `${client.data.user.login} left the chat`,
+        author: null,
+        type: MessageType.info,
+      }),
+    );
 
     client.broadcast.emit('message', userConectedMessage);
   }
 
   @UseGuards(WsMuteGuard)
   @SubscribeMessage('message')
-  handleMessage(@MessageBody('message') text: string): void {
-    this.server.emit('message', text);
+  async handleMessage(
+    @MessageBody('message') text: string,
+    @ConnectedSocket() client: Socket,
+  ): Promise<void> {
+    const userMessage = await this.messagesService.createMessage(
+      plainToClass(CreateMessageDto, {
+        text,
+        author: client.data.user,
+        type: MessageType.user,
+      }),
+    );
+
+    this.server.emit('message', userMessage);
   }
 
   @UseGuards(WsAdminGuard)
@@ -79,12 +103,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (userClient) {
       userClient.data.user.isMuted = result;
 
-      const userToggleMuteMessage: MessageDto = {
-        type: MessageType.info,
-        text: `${userClient.data.user.login} is ${
-          result ? 'muted' : 'unmuted'
-        }`,
-      };
+      const userToggleMuteMessage = await this.messagesService.createMessage(
+        plainToClass(CreateMessageDto, {
+          text: `${userClient.data.user.login} is ${
+            result ? 'muted' : 'unmuted'
+          }`,
+          author: null,
+          type: MessageType.info,
+        }),
+      );
 
       this.server.emit('message', userToggleMuteMessage);
     }
@@ -96,10 +123,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userClient = this.onlineUsersService.getUserSocket(id);
 
     if (userClient) {
-      const userBlockedMessage: MessageDto = {
-        type: MessageType.info,
-        text: `${userClient.data.user.login} is blocked`,
-      };
+      const userBlockedMessage = await this.messagesService.createMessage(
+        plainToClass(CreateMessageDto, {
+          text: `${userClient.data.user.login} is blocked`,
+          author: null,
+          type: MessageType.info,
+        }),
+      );
 
       userClient.broadcast.emit('message', userBlockedMessage);
 
