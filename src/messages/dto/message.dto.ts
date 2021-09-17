@@ -17,4 +17,7 @@ export class MessageDto {
 
   @Expose()
   type: MessageType;
+
+  @Expose()
+  createdAt: MessageType;
 }

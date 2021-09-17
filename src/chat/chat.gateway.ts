@@ -79,7 +79,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @UseGuards(WsMuteGuard)
   @SubscribeMessage('message')
   async handleMessage(
-    @MessageBody('message') text: string,
+    @MessageBody('text') text: string,
     @ConnectedSocket() client: Socket,
   ): Promise<void> {
     const userMessage = await this.messagesService.createMessage(
@@ -91,6 +91,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
 
     this.server.emit('message', userMessage);
+  }
+
+  @SubscribeMessage('get-messages')
+  async handleGetMessages(
+    @MessageBody('currentPage') currentPage: number,
+    @MessageBody('pageSize') pageSize: number,
+    @ConnectedSocket() client: Socket,
+  ): Promise<void> {
+    const messages = await this.messagesService.getMessages(
+      currentPage,
+      pageSize,
+    );
+
+    client.emit('messages', messages);
   }
 
   @UseGuards(WsAdminGuard)
