@@ -43,9 +43,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    client.data.user = await this.usersService.findUser({
+    const user = await this.usersService.findUser({
       id: tokenPayload.id,
     });
+
+    if (user.isBlocked) {
+      client.emit('error', WsErrors.forbidden);
+      client.disconnect(true);
+      return;
+    }
+
+    client.data.user = user;
 
     client.emit('user-data', plainToClass(UserDto, client.data.user));
     this.onlineUsersService.setUser(client.data.user.id, client);
@@ -63,7 +71,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   async handleDisconnect(client: Socket) {
+    if (!client.data?.user) {
+      return;
+    }
+
     this.onlineUsersService.deleteUser(client.data.user.id);
+
+    this.server.emit('online-users', this.onlineUsersService.getOnlineUsers());
 
     const userConectedMessage = await this.messagesService.createMessage(
       plainToClass(CreateMessageDto, {
@@ -117,6 +131,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (userClient) {
       userClient.data.user.isMuted = result;
 
+      this.server.emit(
+        'online-users',
+        this.onlineUsersService.getOnlineUsers(),
+      );
+
       const userToggleMuteMessage = await this.messagesService.createMessage(
         plainToClass(CreateMessageDto, {
           text: `${userClient.data.user.login} is ${
@@ -134,6 +153,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @UseGuards(WsAdminGuard)
   @SubscribeMessage('toggle-block')
   async handleToggleBlock(@MessageBody('id') id: string): Promise<void> {
+    await this.usersService.toggleBlock(id);
+
     const userClient = this.onlineUsersService.getUserSocket(id);
 
     if (userClient) {

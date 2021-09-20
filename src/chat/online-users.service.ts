@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { plainToClass } from 'class-transformer';
 import { Socket } from 'socket.io';
 import { UserDto } from 'src/users/dto/user.dto';
 
@@ -19,8 +20,8 @@ export class OnlineUsersService {
   }
 
   getOnlineUsers(): UserDto[] {
-    return Object.values(Object.fromEntries(this.users)).map(
-      (socket: Socket) => socket.data.user,
+    return Object.values(Object.fromEntries(this.users)).map((socket: Socket) =>
+      plainToClass(UserDto, socket.data.user),
     );
   }
 }
